@@ -1,7 +1,9 @@
 import {  useState, useEffect } from 'react'
 
 
-const baseApi = 'https://testcookie.com:3000/api';
+// const baseApi = 'https://testcookie.com:3000/api';
+
+const baseApi = 'http://localhost:3000/api'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -22,8 +24,9 @@ function App() {
 
   useEffect(() => {
     fetch(`${baseApi}/auth/me`, {
-      credentials: 'include'
-
+      headers: {
+        Authorization: `Bearer ${localStorage.token}`
+      }
     })
     .then(res => {
       if(res.ok) return res.json();
@@ -58,8 +61,8 @@ function App() {
       throw res;
 
     })
-    .then(auth => {
-      console.log(auth)
+    .then(({token}) => {
+      localStorage.setItem('token', token);
     })
     .catch((err) => {
       console.log(err);
