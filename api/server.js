@@ -1,15 +1,24 @@
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
 const cookieParser = require('cookie-parser');
+const cors = require('cors');
+
 const app = express();
 const port = 3000;
 
-app.use(express.urlencoded({extended: true}));
 app.use(cookieParser());
-app.set('view engine', 'ejs');
+app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials: true
+}));
+app.use(express.json());
+app.use(express.urlencoded({extended: true}));
 
-//Fake DB
+
+//Fake DBs
 const db = {
-    users: [
+    users: [ 
         {
             id: 1,
             email: "nguyenvana@gmail.com",
@@ -28,79 +37,100 @@ const db = {
             password: "123456",
             name: "Nguyen Van C"
         }
+    ],
+    posts: [
+        {
+            id: 1,
+            title: "Post title 1",
+            description: 'Description 1'
+
+        },
+        {
+            id: 2,
+            title: 'Post title 2',
+            description: 'Description 2'
+        },
+        {
+            id: 3, 
+            title: 'Post title 3', 
+            description: 'Description 3'
+        },
+        {
+            id: 4,
+            title: 'Post title 4',
+            description: 'Description 4'
+        }
     ]
 }
 
+// Session
 const sessions = {};
 
-// [GET] /login
-app.get('/login', (req,res) => {
+// [GET] /api/posts
+app.get('/api/posts', (req, res) => {
 
-    res.render('pages/login');
-})
+    res.json(db.posts);
 
-// [POST] /login
-app.post('/login', (req, res) => {
-   // console.log(req.body)
+});
+
+// [POST] /api/auth/login
+app.post('/api/auth/login', (req, res) => {
 
     const {email, password} = req.body;
-    const user = db.users.find(user => user.email === email && user.password === password);
-
-    if(user) {
-       const sessionId = Date.now().toString();
-       sessions[sessionId] = {
-        userId: user.id
-        // createdAt
-        // maxage: 3600
-       }
-
-       console.log(sessions);
-
-       res.setHeader(
-              "Set-Cookie", 
-               `sessionId=${sessionId}; max-age=3600; httpOnly`
-            ).redirect('/dashboard');
-
-       return;     
-    }
-   res.send('<h2>Email or Password is nor valid!!</h2>')
-})
-
-
-// [GET] //logout
-app.get('/logout', (req, res) => {
-    delete sessions[req.cookies.sessionId];
-   
-    res.setHeader(
-        'Set-Cookie', 'sessionId=; max-age=0'
-    ).redirect('/login');
-    
-} );
-
-// [GET] /dashboard
-app.get('/dashboard', (req, res) => {
-    const session = sessions[req.cookies.sessionId];
-
-    if(!session) {
-        res.redirect('/login');
-    }
-    const user = db.users.find(user => user.id === session.userId);
+    const user = db.users.find(user => user.email === email && user.password === password );
+     
     if(!user) {
-        res.redirect('/login');
+        res.status(401)
+        .json({
+            message: 'Unauthorired'
+        })
+        return;
     }
     
-    res.render('pages/dashboard', {user})
-})
+   console.log(email, password);
 
+   const sessionId = Date.now().toString();
+   sessions[sessionId] = {sub: user.id}; // subject: userId
 
-// [GET] /
-app.get('/', (req, res) => {
+   res.setHeader('Set-Cookie', 
+      `sessionId=${sessionId}; HttpOnly; Max-Age=3600; SameSite=None; Secure; Partitioned`)
+   .json(user);
 
-    res.render('pages/index')
-
-})
-
-
-app.listen(port, () => {
-    console.log(`Demo app is running on port:  ${port} `)
 });
+
+// [GET] /api/auth/me
+app.get('/api/auth/me', (req, res) => {
+   // console.log(req.cookies);
+   const session = sessions[req.cookies.sessionId];
+
+   if(!session) {
+    return res.status(401).json({
+        message: 'Unauthorized',
+        reason: 'Not found cookie'
+    })
+   }
+
+   const user = db.users.find(user => user.id === session.sub);
+   if(!user) {
+     return res.status(401).json({
+        message: 'Unauthorize',
+        reason: 'Not found information user'
+     })
+   }
+   
+    res.json(user);
+
+})
+
+
+// app.listen(port, () => {
+//     console.log(`Application is running in port ${port} `);
+// })
+
+https.createServer({
+    key: fs.readFileSync("testcookie.com+2-key.pem"),
+    cert: fs.readFileSync("testcookie.com+2.pem")
+}, app)
+.listen(port, () => {
+    console.log(`Demo app is running in port ${port}`);
+})

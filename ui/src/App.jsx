@@ -1,34 +1,112 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import {  useState, useEffect } from 'react'
+
+
+const baseApi = 'https://testcookie.com:3000/api';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [user, setUser] = useState(null);
+  const [error, setError] = useState('');
+  const [fields, setFields] = useState({
+    email: 'nguyenvana@gmail.com',
+    password: '123456'
+  });
+
+
+  const setFieldValue = ({ target: {name, value }}) => {
+    setFields(prev => ({
+      ...prev,
+      [name]: value,
+     
+    }));
+  }
+
+  useEffect(() => {
+    fetch(`${baseApi}/auth/me`, {
+      credentials: 'include'
+
+    })
+    .then(res => {
+      if(res.ok) return res.json();
+
+      throw res;
+    })
+    .then(me =>  {
+      console.log(me);
+      setUser(me);
+    })
+    .catch(error => {
+       console.log(error);
+    })
+
+  }, [])
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setError('');
+
+    fetch(`${baseApi}/auth/login`,
+        {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify(fields)
+        })
+    .then(res => {
+      if(res.ok) return res.json();
+      throw res;
+
+    })
+    .then(auth => {
+      console.log(auth)
+    })
+    .catch((err) => {
+      console.log(err);
+      if(err.status === 401) {
+        setError("Email or Passeord is failure.");
+        return;
+      }
+      setError('Unsure about the error, please try again or contact to be supported.')
+    })    
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div>
+       {user ? (
+        <h1>Hello {user.name}</h1>
+       ) : (
+        <>
+         <h1>Log in</h1>
+      <form onSubmit={handleLogin}>
+       <div>
+         <label htmlFor='email'>Email</label>
+         <input 
+             type='text' 
+             name='email'
+             placeholder='Email'
+             value={fields.email} 
+             onChange={setFieldValue} 
+             id='email' />
+         
+        </div>
+        <div>
+          <label htmlFor='password'>Password</label>
+          <input
+               type='password'
+               name='password'
+               value={fields.password}
+               onChange={setFieldValue} 
+               placeholder='Password' 
+               id='password' />
+        </div>
+        <button>Login</button>
+      </form>
+
+      {!!error && <p style={{color: 'red', fontSize: '14px', fontStyle: 'italic'}}>{error}</p>}
+        </>
+       )}
+    </div>
   )
 }
 
