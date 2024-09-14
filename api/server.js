@@ -70,6 +70,31 @@ const db = {
   ],
 };
 
+// [POST] /api/interval
+app.post("/api/interval", (req, res) => {
+  console.log("Client connected");
+  console.log(req.body)
+  if (req.body  ) {
+    const newInterval = req.body.interval;
+    // Update the interval if received a new value from the client
+    console.log(`New interval: ${newInterval} second(s)`);
+    if (!isNaN(newInterval) && newInterval > 0) {
+      const value = Math.floor(Math.random() * 100);
+      return res.status(200).json({
+        randomValue: value.toString(),
+      });
+    } else {
+      return res.status(400).json({
+        message: "Bad request",
+      });
+    }
+  } else {
+    return res.status(400).json({
+      message: "Bad request",
+    });
+  }
+});
+
 // [POST] /api/auth/test-cookie
 app.post("/api/auth/test-cookie", (req, res) => {
   console.log("Test cookie");
@@ -131,8 +156,7 @@ app.post("/api/auth/refresh-token", (req, res) => {
   const refreshToken = req.cookies.refreshToken;
   console.log(req.cookies);
 
- 
-  if(!refreshToken) {
+  if (!refreshToken) {
     return res.status(403).json({
       message: "Unauthorized",
       reason: "Not found token",
@@ -167,34 +191,24 @@ app.post("/api/auth/refresh-token", (req, res) => {
       reason: "Refresh Token is expried",
     });
   }
-   
 
   const newAccessToken = createAccessToken(user);
   const newRefreshToken = createRefreshToken(user);
 
-   // 3600: 1h, 60: 1p, 300: 5p
-   const cookies = [
-    `accessToken=${newAccessToken}; httpOnly; max-age=300`,
-    `refreshToken=${newRefreshToken}; httpOnly; max-age=300`
-  ];
+  // 3600: 1h, 60: 1p, 300: 5p
+  const cookies = [`accessToken=${newAccessToken}; httpOnly; max-age=300`, `refreshToken=${newRefreshToken}; httpOnly; max-age=300`];
 
   res.setHeader("Set-Cookie", cookies).json(user);
-
-  
-  
 });
 
 // [POST] /api/auth/logout
 app.post("/api/auth/logout", (req, res) => {
-  const cookies = [
-    `accessToken=; httpOnly; max-age=300`,
-    `refreshToken=; httpOnly; max-age=300`
-  ];
+  const cookies = [`accessToken=; httpOnly; max-age=300`, `refreshToken=; httpOnly; max-age=300`];
 
   res.setHeader("Set-Cookie", cookies).json({
-    logout: "ok"
+    logout: "ok",
   });
-})
+});
 
 // [POST] /api/auth/login
 app.post("/api/auth/login", (req, res) => {
@@ -297,12 +311,9 @@ app.post("/api/auth/login-test", (req, res) => {
 
   const accessToken = createAccessToken(user);
   const refreshToken = createRefreshToken(user);
-  
+
   // 3600: 1h, 60: 1p, 300: 5p
-  const cookies = [
-    `accessToken=${accessToken}; httpOnly; max-age=300`,
-    `refreshToken=${refreshToken}; httpOnly; max-age=300`
-  ];
+  const cookies = [`accessToken=${accessToken}; httpOnly; max-age=300`, `refreshToken=${refreshToken}; httpOnly; max-age=300`];
 
   res.setHeader("Set-Cookie", cookies).json(user);
 });
@@ -330,7 +341,6 @@ function createAccessToken(user) {
 
   const accessToken = `${tokenData}.${signature}`;
   return accessToken;
-
 }
 
 function createRefreshToken(user) {
@@ -340,7 +350,7 @@ function createRefreshToken(user) {
   };
   const payload = {
     sub: user.id,
-    exp: Date.now() + 3600000 / 60 * 2 , // 2  minute
+    exp: Date.now() + (3600000 / 60) * 2, // 2  minute
   };
 
   // encoded base64(json(header & payload))
@@ -356,7 +366,6 @@ function createRefreshToken(user) {
 
   const refreshToken = `${tokenData}.${signature}`;
   return refreshToken;
-
 }
 
 // https.createServer({
