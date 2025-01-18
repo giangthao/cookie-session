@@ -4,11 +4,17 @@ const crypto = require("crypto");
 const { base64url } = require("./helpers");
 const cookieParser = require("cookie-parser");
 
+const multer = require("multer");
+const path = require("path");
+const fs = require('fs');  // Import fs module
+
+
 const app = express();
 const port = 3000;
 const jwtSecret =
   "PeZbpag1X/VOd0N1Tv0dwfLh0H2YtauDaOMp3vXprvpSMibxGlBjE/2UtQDkTxwOEA3his1KBwUyIY92NSN6Cj9h1eSpTQ4sm5vGJYdgsMfdh8uZR0wLgW2GewaXqpzO/l4zK3E3M9QBupEEtvY+cLzkcMaMbcCoI4dwo9huChyu/cCTPIBEcGwJ1v1ep2bpqPjiIFW/8jUjadUwj3z7Gok/6lNYkya7J0iVb+VLvD25ByS+NmFC8yVRecu4JygTo+0NxvKGWWTDZX3gsJ383+Ho4wlDqjWNVgRKcZ08OzLQKcitX0Mq2VgZjvQB8UqC6smBx/Gz67brVKFy4BB6ZQ==";
 
+// Middleware
 app.use(
   cors({
     origin: "http://localhost:4200",
@@ -18,6 +24,130 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Configure Multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Folder to save uploaded files
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `${uniqueSuffix}-${file.originalname}`); // Rename file with timestamp
+  },
+});
+
+const upload = multer({ storage });
+
+// Serve uploaded files statically
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+app.get('/generate-csv', (req, res) => {
+  // Dữ liệu cần chuyển đổi thành CSV
+  const data = [
+    { name: "John", age: 30, city: "New York" },
+    { name: "Jane", age: 25, city: "Los Angeles" },
+    { name: "Doe", age: 22, city: "Chicago" }
+  ];
+
+  // Tạo nội dung CSV từ dữ liệu
+  const csvContent = generateCSV(data);
+
+  // Lưu CSV vào file
+  const filePath = saveCSVToFile(csvContent);
+
+  // Gửi file CSV cho client để tải về
+  res.setHeader('Content-Disposition', `attachment; filename=${path.basename(filePath)}`);
+  res.setHeader('Content-Type', 'text/csv');
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error('Error sending file:', err);
+      res.status(500).send('Error sending file');
+    }
+
+    // Xóa file sau khi gửi xong (tuỳ chọn)
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error('Error deleting file:', err);
+      } else {
+        console.log('File deleted successfully');
+      }
+    });
+  });
+});
+
+const generateCSV = (data) => {
+  const header = Object.keys(data[0]).join(",");  
+  const rows = data.map(row => Object.values(row).join(","));
+  return [header, ...rows].join("\n");
+};
+
+const saveCSVToFile = (csvContent) => {
+  const filename = `audit_results_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  const filePath = path.join(__dirname, 'uploads', filename);
+
+  fs.writeFileSync(filePath, csvContent);
+  return filePath;
+};
+
+// API nhận requestId, tạo file và trả về
+app.get('/generate-file', (req, res) => {
+  const requestId = req.query.requestId; // Lấy requestId từ query parameter
+
+  if (!requestId) {
+    return res.status(400).json({ error: 'requestId is required' });
+  }
+
+  // Tên file: audit_results_<timestamp>.txt
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `audit_results_${timestamp}.txt`;
+
+  // Nội dung file: requestId
+  const content = `Request ID: ${requestId}`;
+
+  // Ghi nội dung vào file (trong thư mục tạm)
+  const filePath = path.join(__dirname, filename);
+  
+  fs.writeFile(filePath, content, (err) => {
+    if (err) {
+      console.error('Error writing file:', err);
+      return res.status(500).json({ error: 'Failed to generate file' });
+    }
+
+    // Trả file về client
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.setHeader('Content-Type', 'text/plain');
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        res.status(500).send('Error sending file');
+      } else {
+        // Xóa file sau khi gửi thành công
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.error('Error deleting file:', err);
+          }
+        });
+      }
+    });
+  });
+});
+
+// API route to handle file upload
+app.post("/upload", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+  res.status(200).json({
+    message: "File uploaded successfully",
+    file: req.file,
+  });
+
+  // Giả lập xử lý lâu hơn 120 giây
+  // setTimeout(() => {
+  //   res.status(200).json({ message: 'File processed successfully!', file: req.file });
+  // }, 130000); // 130 giây (dài hơn 120 giây để gây timeout ở client)
+});
+
 
 //Fake DBs
 const db = {
